@@ -1055,7 +1055,7 @@ class Runner:
     # the agent that returned the corresponding function call regardless the
     # type of the agent. e.g. a remote a2a agent may surface a credential
     # request as a special long-running function tool call.
-    filtered_events = contents._filter_rewound_events(session.events)
+    filtered_events = contents.filter_rewound_events(session.events)
     event = find_matching_function_call(filtered_events)
     if event and event.author:
       return root_agent.find_agent(event.author)

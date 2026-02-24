@@ -406,7 +406,7 @@ def _process_compaction_events(events: list[Event]) -> list[Event]:
   return [event for _, _, event in processed_items]
 
 
-def _filter_rewound_events(events: list[Event]) -> list[Event]:
+def filter_rewound_events(events: list[Event]) -> list[Event]:
   """Returns events with those annulled by a rewind removed.
 
   Iterates backward; when a rewind marker is found, skips all events
@@ -459,7 +459,7 @@ def _get_contents(
   accumulated_output_transcription = ''
 
   # Filter out events that are annulled by a rewind.
-  rewind_filtered_events = _filter_rewound_events(events)
+  rewind_filtered_events = filter_rewound_events(events)
 
   # Parse the events, leaving the contents and the function calls and
   # responses from the current agent.

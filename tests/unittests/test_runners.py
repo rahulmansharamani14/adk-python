@@ -31,7 +31,7 @@ from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactServ
 from google.adk.cli.utils.agent_loader import AgentLoader
 from google.adk.events.event import Event
 from google.adk.events.event import EventActions
-from google.adk.flows.llm_flows.contents import _filter_rewound_events
+from google.adk.flows.llm_flows.contents import filter_rewound_events
 from google.adk.plugins.base_plugin import BasePlugin
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
