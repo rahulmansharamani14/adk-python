@@ -418,16 +418,20 @@ def filter_rewound_events(events: list[Event]) -> list[Event]:
   Returns:
     A new list with rewound events removed, in the original order.
   """
+  # Pre-compute the first occurrence index of each invocation_id for O(1) lookup.
+  first_occurrence: dict[str, int] = {}
+  for idx, event in enumerate(events):
+    if event.invocation_id not in first_occurrence:
+      first_occurrence[event.invocation_id] = idx
+
   filtered = []
   i = len(events) - 1
   while i >= 0:
     event = events[i]
     if event.actions and event.actions.rewind_before_invocation_id:
       rewind_id = event.actions.rewind_before_invocation_id
-      for j in range(0, i):
-        if events[j].invocation_id == rewind_id:
-          i = j
-          break
+      if rewind_id in first_occurrence and first_occurrence[rewind_id] < i:
+        i = first_occurrence[rewind_id]
     else:
       filtered.append(event)
     i -= 1
