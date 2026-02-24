@@ -30,6 +30,8 @@ from google.adk.apps.app import ResumabilityConfig
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.cli.utils.agent_loader import AgentLoader
 from google.adk.events.event import Event
+from google.adk.events.event import EventActions
+from google.adk.flows.llm_flows.contents import _filter_rewound_events
 from google.adk.plugins.base_plugin import BasePlugin
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
@@ -640,6 +642,95 @@ async def test_runner_allows_nested_agent_directories(tmp_path, monkeypatch):
     result = self.runner._is_transferable_across_agent_tree(non_llm_agent)
     assert result is False
 
+
+def test_find_agent_to_run_ignores_rewound_sub_agent_event():
+  """After a rewind, events from the rewound invocation are ignored."""
+  root_agent = MockLlmAgent("root_agent")
+  sub_agent1 = MockLlmAgent("sub_agent1", parent_agent=root_agent)
+  root_agent.sub_agents = [sub_agent1]
+
+  runner = Runner(
+      app_name="test_app",
+      agent=root_agent,
+      session_service=InMemorySessionService(),
+      artifact_service=InMemoryArtifactService(),
+  )
+
+  # sub_agent1 was the last active agent during inv1
+  sub_agent_event = Event(
+      invocation_id="inv1",
+      author="sub_agent1",
+      content=types.Content(
+          role="model", parts=[types.Part(text="Sub agent response")]
+      ),
+  )
+  # Rewind event that annuls inv1 and everything after it
+  rewind_event = Event(
+      invocation_id="inv2",
+      author="user",
+      actions=EventActions(rewind_before_invocation_id="inv1"),
+  )
+  session = Session(
+      id="test_session",
+      user_id="test_user",
+      app_name="test_app",
+      events=[sub_agent_event, rewind_event],
+  )
+
+  result = runner._find_agent_to_run(session, root_agent)
+  assert result == root_agent
+
+
+def test_find_agent_to_run_ignores_rewound_function_call():
+  """After a rewind, a function call from the rewound invocation is not matched."""
+  root_agent = MockLlmAgent("root_agent")
+  sub_agent2 = MockLlmAgent("sub_agent2", parent_agent=root_agent)
+  root_agent.sub_agents = [sub_agent2]
+
+  runner = Runner(
+      app_name="test_app",
+      agent=root_agent,
+      session_service=InMemorySessionService(),
+      artifact_service=InMemoryArtifactService(),
+  )
+
+  function_call = types.FunctionCall(id="func_789", name="test_func", args={})
+  function_response = types.FunctionResponse(
+      id="func_789", name="test_func", response={}
+  )
+
+  # sub_agent2 issued a function call in inv1
+  call_event = Event(
+      invocation_id="inv1",
+      author="sub_agent2",
+      content=types.Content(
+          role="model", parts=[types.Part(function_call=function_call)]
+      ),
+  )
+  # User provides the function response, also in inv1
+  response_event = Event(
+      invocation_id="inv1",
+      author="user",
+      content=types.Content(
+          role="user", parts=[types.Part(function_response=function_response)]
+      ),
+  )
+  # Rewind event that annuls inv1
+  rewind_event = Event(
+      invocation_id="inv2",
+      author="user",
+      actions=EventActions(rewind_before_invocation_id="inv1"),
+  )
+  session = Session(
+      id="test_session",
+      user_id="test_user",
+      app_name="test_app",
+      events=[call_event, response_event, rewind_event],
+  )
+
+  # The rewound function call should not be matched; root_agent is returned
+  result = runner._find_agent_to_run(session, root_agent)
+  assert result == root_agent
 
 @pytest.mark.asyncio
 async def test_run_config_custom_metadata_propagates_to_events():

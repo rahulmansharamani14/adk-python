@@ -406,6 +406,35 @@ def _process_compaction_events(events: list[Event]) -> list[Event]:
   return [event for _, _, event in processed_items]
 
 
+def _filter_rewound_events(events: list[Event]) -> list[Event]:
+  """Returns events with those annulled by a rewind removed.
+
+  Iterates backward; when a rewind marker is found, skips all events
+  back to the rewind_before_invocation_id.
+
+  Args:
+    events: The full event list from the session.
+
+  Returns:
+    A new list with rewound events removed, in the original order.
+  """
+  filtered = []
+  i = len(events) - 1
+  while i >= 0:
+    event = events[i]
+    if event.actions and event.actions.rewind_before_invocation_id:
+      rewind_id = event.actions.rewind_before_invocation_id
+      for j in range(0, i):
+        if events[j].invocation_id == rewind_id:
+          i = j
+          break
+    else:
+      filtered.append(event)
+    i -= 1
+  filtered.reverse()
+  return filtered
+
+
 def _get_contents(
     current_branch: Optional[str],
     events: list[Event],
@@ -430,23 +459,7 @@ def _get_contents(
   accumulated_output_transcription = ''
 
   # Filter out events that are annulled by a rewind.
-  # By iterating backward, when a rewind event is found, we skip all events
-  # from that point back to the `rewind_before_invocation_id`, thus removing
-  # them from the history used for the LLM request.
-  rewind_filtered_events = []
-  i = len(events) - 1
-  while i >= 0:
-    event = events[i]
-    if event.actions and event.actions.rewind_before_invocation_id:
-      rewind_invocation_id = event.actions.rewind_before_invocation_id
-      for j in range(0, i, 1):
-        if events[j].invocation_id == rewind_invocation_id:
-          i = j
-          break
-    else:
-      rewind_filtered_events.append(event)
-    i -= 1
-  rewind_filtered_events.reverse()
+  rewind_filtered_events = _filter_rewound_events(events)
 
   # Parse the events, leaving the contents and the function calls and
   # responses from the current agent.
