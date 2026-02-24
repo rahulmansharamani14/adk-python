@@ -29,6 +29,7 @@ from google.adk.apps.app import App
 from google.adk.apps.app import ResumabilityConfig
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.cli.utils.agent_loader import AgentLoader
+from google.adk.errors.session_not_found_error import SessionNotFoundError
 from google.adk.events.event import Event
 from google.adk.events.event import EventActions
 from google.adk.flows.llm_flows.contents import filter_rewound_events
@@ -245,7 +246,7 @@ async def test_session_not_found_message_includes_alignment_hint():
       new_message=types.Content(role="user", parts=[]),
   )
 
-  with pytest.raises(ValueError) as excinfo:
+  with pytest.raises(SessionNotFoundError) as excinfo:
     await agen.__anext__()
 
   await agen.aclose()
