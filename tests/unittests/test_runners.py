@@ -733,6 +733,7 @@ def test_find_agent_to_run_ignores_rewound_function_call():
   result = runner._find_agent_to_run(session, root_agent)
   assert result == root_agent
 
+
 @pytest.mark.asyncio
 async def test_run_config_custom_metadata_propagates_to_events():
   session_service = InMemorySessionService()
